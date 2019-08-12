@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- namespace:配置接口的全路径 -->
+<mapper namespace="com.t239.dao.UserMapper">
+	<!-- 启用查询结果的缓存 -->
+	<cache eviction="FIFO" flushInterval="60000" size="512" readOnly="true" />
+	<!-- id:sql语句唯一标识,一般跟方法同名 -->
+	<!-- resultType:配置语句执行后的返回结果类型 -->
+	<select id="countUser" resultType="int">
+		SELECT COUNT(*) FROM
+		`smbms_user`
+	</select>
+	<select id="getAllUser" resultType="user" useCache="true">
+		SELECT
+		`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,`createdBy`,
+		`creationDate`,`modifyBy`,`modifyDate` FROM `smbms_user`
+	</select>
+	<select id="getUserByCodeAndPwd" resultType="user">
+		SELECT
+		`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,`createdBy`,
+		`creationDate`,`modifyBy`,`modifyDate` FROM `smbms_user`
+		where
+		userCode=#{code} and userPassword=#{pwd}
+	</select>
+	<!-- 配置resultMap：属性和列名不一致 -->
+	<resultMap type="user" id="userRoleMap">
+		<id column="id" property="id" />
+		<result property="userRoleName" column="roleName" />
+		<!-- 多对一配置 -->
+		<association property="role" javaType="role">
+			<id property="rid" column="rid" />
+			<result property="roleCode" column="roleCode" />
+			<result property="roleName" column="roleName" />
+		</association>
+	</resultMap>
+	<!-- 配置Role的resultMap -->
+	<resultMap type="role" id="roleUserMap">
+		<id property="rid" column="rid" />
+		<result property="roleCode" column="roleCode" />
+		<result property="roleName" column="roleName" />
+		<!-- 配置一对多 -->
+		<collection property="userlist" ofType="user">
+			<id property="id" column="id" />
+			<result property="userRoleName" column="roleName" />
+		</collection>
+	</resultMap>
+	<!-- resultType="user" -->
+	<select id="getUserByName" parameterType="hashmap" resultMap="userRoleMap">
+		SELECT u.`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,u.`createdBy`,
+		u.`creationDate`,u.`modifyBy`,u.`modifyDate`,
+		r.`roleName`,r.rid,r.roleCode FROM
+		`smbms_user` u
+		INNER JOIN
+		`smbms_role` r ON r.`rid`=u.`userRole`
+		<!-- WHERE 1=1 -->
+		<!-- <where> <if test="name!=null and name!=''"> and userName LIKE CONCAT('%',#{name},'%') 
+			</if> <if test="roleId!=null and roleId!=''"> and u.userRole=#{roleId} </if> 
+			</where> -->
+		<trim prefix="where" prefixOverrides="and|or" suffix="order by userRole desc">
+			<if test="name!=null and name!=''">
+				and userName LIKE CONCAT('%',#{name},'%')
+			</if>
+			<if test="roleId!=null and roleId!=''">
+				and u.userRole=#{roleId}
+			</if>
+		</trim>
+	</select>
+
+	<!-- 新增 -->
+	<insert id="insertUser" parameterType="user">
+		insert into smbms_user
+		(userCode,userName,userPassword,idPicPath,workPicPath)
+		values
+		(#{userCode},#{userName},#{userPassword},#{idPicPath},#{workPicPath})
+	</insert>
+	<!-- 修改 -->
+	<update id="updateUser" parameterType="user">
+		update smbms_user <!-- set -->
+		<!-- <set> <if test="userCode!=null and userCode!=''"> userCode=#{userCode}, 
+			</if> <if test="userName!=null and userName!=''"> userName=#{userName}, </if> 
+			<if test="userPassword!=null and userPassword!=''"> userPassword=#{userPassword}, 
+			</if> </set> where id=#{id} -->
+		<trim prefix="set" suffixOverrides="," suffix="where id=#{id}">
+			<if test="userCode!=null and userCode!=''">
+				userCode=#{userCode},
+			</if>
+			<if test="userName!=null and userName!=''">
+				userName=#{userName},
+			</if>
+			<if test="userPassword!=null and userPassword!=''">
+				userPassword=#{userPassword},
+			</if>
+		</trim>
+
+	</update>
+	<!-- 删除 -->
+	<delete id="deleteUser" parameterType="int">
+		delete from smbms_user
+		where id=#{id}
+	</delete>
+
+	<!-- 根据角色查询员工信息 -->
+	<select id="getRoleById" parameterType="hashmap" resultMap="roleUserMap">
+		SELECT u.`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,u.`createdBy`,
+		u.`creationDate`,u.`modifyBy`,u.`modifyDate`,
+		r.`roleName`,r.rid,r.roleCode FROM
+		`smbms_user` u
+		INNER JOIN
+		`smbms_role` r ON r.`rid`=u.`userRole`
+		WHERE u.userRole=#{rid}
+	</select>
+
+	<select id="getUserByRoleIds" parameterType="hashmap" resultMap="userRoleMap">
+		SELECT u.`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,u.`createdBy`,
+		u.`creationDate`,u.`modifyBy`,u.`modifyDate`,
+		r.`roleName`,r.rid,r.roleCode FROM
+		`smbms_user` u
+		INNER JOIN
+		`smbms_role` r ON r.`rid`=u.`userRole`
+		where r.`rid` in
+		<foreach collection="array" item="rids" open="(" close=")"
+			separator=",">
+			#{rids}
+		</foreach>
+	</select>
+	<select id="getUserByRoleIds2" parameterType="hashmap"
+		resultMap="userRoleMap">
+		SELECT u.`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,u.`createdBy`,
+		u.`creationDate`,u.`modifyBy`,u.`modifyDate`,
+		r.`roleName`,r.rid,r.roleCode FROM
+		`smbms_user` u
+		INNER JOIN
+		`smbms_role` r ON r.`rid`=u.`userRole`
+		where r.`rid` in
+		<foreach collection="list" item="rid" open="(" close=")"
+			separator=",">
+			#{rid}
+		</foreach>
+	</select>
+	<select id="getUserByRoleIds3" parameterType="hashmap"
+		resultMap="userRoleMap">
+		SELECT u.`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,u.`createdBy`,
+		u.`creationDate`,u.`modifyBy`,u.`modifyDate`,
+		r.`roleName`,r.rid,r.roleCode FROM
+		`smbms_user` u
+		INNER JOIN
+		`smbms_role` r ON r.`rid`=u.`userRole`
+		where r.`rid` in
+		<foreach collection="rids" item="rid" open="(" close=")"
+			separator=",">
+			#{rid}
+		</foreach>
+	</select>
+
+	<select id="getUserByChoose" parameterType="hashmap" resultMap="userRoleMap">
+		SELECT u.`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,u.`createdBy`,
+		u.`creationDate`,u.`modifyBy`,u.`modifyDate`,
+		r.`roleName`,r.rid,r.roleCode FROM
+		`smbms_user` u
+		INNER JOIN
+		`smbms_role` r ON r.`rid`=u.`userRole`
+		<where>
+			<choose>
+				<when test="name!=null and name!=''">and userName LIKE CONCAT('%',#{name},'%')</when>
+				<when test="roleId!=null and roleId!=''">and u.userRole=#{roleId}</when>
+				<otherwise>
+					and u.`id`=#{uid}
+				</otherwise>
+			</choose>
+		</where>
+	</select>
+
+	<select id="getUserCount" parameterType="hashmap" resultType="int">
+		SELECT count(*) FROM `smbms_user` u
+		INNER JOIN `smbms_role` r ON
+		r.`rid`=u.`userRole`
+		<trim prefix="where" prefixOverrides="and|or">
+			<if test="name!=null and name!=''">
+				and userName LIKE CONCAT('%',#{name},'%')
+			</if>
+			<if test="roleId!=null and roleId!=''">
+				and u.userRole=#{roleId}
+			</if>
+		</trim>
+	</select>
+	<select id="getUserByPage" parameterType="hashmap" resultMap="userRoleMap">
+		SELECT u.`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,u.`createdBy`,
+		u.`creationDate`,u.`modifyBy`,u.`modifyDate`,
+		r.`roleName`,r.rid,r.roleCode FROM
+		`smbms_user` u
+		INNER JOIN
+		`smbms_role` r ON r.`rid`=u.`userRole`
+		<trim prefix="where" prefixOverrides="and|or">
+			<if test="name!=null and name!=''">
+				and userName LIKE CONCAT('%',#{name},'%')
+			</if>
+			<if test="roleId!=null and roleId!=''">
+				and u.userRole=#{roleId}
+			</if>
+		</trim>
+		limit #{startrow},#{pagesize}
+	</select>
+	<!-- 根据id查询用户信息 -->
+	<select id="getUserById" resultType="user">
+		SELECT
+		`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,`createdBy`,
+		`creationDate`,`modifyBy`,`modifyDate` FROM `smbms_user`
+		where id=#{id}
+	</select>
+	<select id="getUserByCode" resultType="user">
+		SELECT
+		`id`,`userCode`,`userName`,`userPassword`,
+		`gender`,`birthday`,`phone`,`address`,`userRole`,`createdBy`,
+		`creationDate`,`modifyBy`,`modifyDate` FROM `smbms_user`
+		where
+		userCode=#{code}
+	</select>
+</mapper>
